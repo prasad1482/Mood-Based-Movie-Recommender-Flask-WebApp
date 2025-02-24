@@ -1,50 +1,61 @@
 from flask import Flask, render_template, request
-import pandas as pd
 import requests
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")  # Load API key from .env
 
 app = Flask(__name__)
 
-# Load data (same as before)
-movies = pd.read_csv('movies.csv')
-ratings = pd.read_csv('ratings.csv')
-def get_trending_movies():
-    API_KEY = "a4bfff289f38de7a9cf6855b74fca641"  # Replace with your key
-    url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={API_KEY}"
-    response = requests.get(url)
-    movies = response.json()["results"]
-    return [movie["title"] for movie in movies[:5]]  # Top 5 trending titles
+# Fetch TMDB genre list
+def get_tmdb_genres():
+    url = "https://api.themoviedb.org/3/genre/movie/list"
+    params = {"api_key": TMDB_API_KEY}  # Use the loaded API key
+    response = requests.get(url, params=params)
+    return {genre["name"].lower(): genre["id"] for genre in response.json()["genres"]}
 
-# Mood-to-genre mapping (same as before)
-mood_to_genre = {
-    'adventurous': ['Action', 'Adventure', 'Thriller'],
-    'romantic': ['Romance', 'Drama'],
-    'funny': ['Comedy'],
-    'scared': ['Horror', 'Thriller'],
-    'thoughtful': ['Documentary', 'Drama']
+# Map moods to TMDB genre IDs
+genre_name_to_id = get_tmdb_genres()
+mood_to_genre_ids = {
+    "adventurous": ["action", "adventure"],
+    "romantic": ["romance"],
+    "funny": ["comedy"],
+    "scared": ["horror"],
+    "thoughtful": ["drama", "mystery"]
 }
 
-# Recommendation function (same as before)
-def recommend_movies(mood):
-    target_genres = mood_to_genre.get(mood.lower(), [])
-    if not target_genres:
-        return []
-    filtered_movies = movies[movies['genres'].apply(lambda x: any(genre in x for genre in target_genres))]
-    movie_ratings = pd.merge(filtered_movies, ratings, on='movieId')
-    avg_ratings = movie_ratings.groupby('title')['rating'].mean().sort_values(ascending=False)
-    return avg_ratings.head(5).index.tolist()  # Return top 5 movie titles
+# Convert genre names to IDs
+for mood, genres in mood_to_genre_ids.items():
+    mood_to_genre_ids[mood] = [genre_name_to_id[genre] for genre in genres]
 
-# Route for the homepage
+# Recommendation function
+def recommend_movies(mood):
+    genre_ids = mood_to_genre_ids.get(mood.lower(), [])
+    if not genre_ids:
+        return []
+    
+    url = "https://api.themoviedb.org/3/discover/movie"
+    params = {
+        "api_key": TMDB_API_KEY,
+        "with_genres": ",".join(map(str, genre_ids)),
+        "sort_by": "popularity.desc",
+        "primary_release_year": 2024,
+        "vote_count.gte": 100
+    }
+    response = requests.get(url, params=params)
+    return response.json()["results"][:6]  # Top 6 movies
+
+# Routes
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    trending_movies = get_trending_movies()  # Fetch live data
+    recommendations = []
+    mood = ""
     if request.method == 'POST':
-        user_mood = request.form['mood']
-        recommendations = recommend_movies(user_mood)
-        return render_template('magic-mv-web.html', 
-                             recommendations=recommendations, 
-                             mood=user_mood,
-                             trending=trending_movies)
-    return render_template('magic-mv-web.html', trending=trending_movies)
+        mood = request.form['mood']
+        recommendations = recommend_movies(mood)
+    return render_template('magic-mv-web.html', recommendations=recommendations, mood=mood)
 
 if __name__ == '__main__':
     app.run(debug=True)
