@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Movie Magic 🎬</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 50px; }
+        input { padding: 10px; font-size: 16px; }
+        button { padding: 10px 20px; background: #4CAF50; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h1>What's Your Mood Today? 😊</h1>
+    <form method="POST">
+        <input type="text" name="mood" placeholder="e.g., adventurous" required>
+        <button type="submit">Recommend Movies!</button>
+    </form>
+
+    {% if recommendations %}
+        <h2>Top Movies for "{{ mood }}" 🍿:</h2>
+        <ul style="list-style: none; padding: 0;">
+            {% for movie in recommendations %}
+                <li>{{ movie }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</body>
+</html>
