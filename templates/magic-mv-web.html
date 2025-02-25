@@ -7,6 +7,9 @@
         body { background: #f0f2f5; min-height: 100vh; }
         .card { transition: transform 0.3s; }
         .card:hover { transform: translateY(-5px); }
+        #suggestions { display: none; margin-top: 5px; }
+        .suggestion-item { cursor: pointer; padding: 5px; }
+        .suggestion-item:hover { background: #f8f9fa; }
     </style>
 </head>
 <body class="py-5">
@@ -14,9 +17,13 @@
         <h1 class="text-center mb-5 display-4 text-primary">🎬 Movie Mood Magic</h1>
         
         <form method="POST" class="mb-5 text-center">
-            <input type="text" name="mood" 
-                   class="form-control form-control-lg w-50 mx-auto mb-3" 
-                   placeholder="How are you feeling? (e.g., adventurous)">
+            <div class="position-relative w-50 mx-auto">
+                <input type="text" name="mood" id="moodInput" 
+                       class="form-control form-control-lg mb-3" 
+                       placeholder="How are you feeling? (e.g., adventurous)"
+                       autocomplete="off">
+                <div id="suggestions" class="position-absolute bg-white border w-100"></div>
+            </div>
             <button type="submit" class="btn btn-primary btn-lg px-5">
                 Find Movies!
             </button>
@@ -45,5 +52,29 @@
             </div>
         {% endif %}
     </div>
+
+    <script>
+        const supportedMoods = [
+            "adventurous", "romantic", "funny", "scared", "thoughtful",
+            "joyful", "sad", "angry", "nostalgic", "inspired"
+        ];
+
+        const moodInput = document.getElementById("moodInput");
+        const suggestionsDiv = document.getElementById("suggestions");
+
+        moodInput.addEventListener("input", function () {
+            const userInput = this.value.toLowerCase();
+            const matches = supportedMoods.filter(mood => mood.includes(userInput));
+            suggestionsDiv.innerHTML = matches.map(mood => `
+                <div class="suggestion-item" onclick="selectMood('${mood}')">${mood}</div>
+            `).join("");
+            suggestionsDiv.style.display = matches.length ? "block" : "none";
+        });
+
+        function selectMood(mood) {
+            moodInput.value = mood;
+            suggestionsDiv.style.display = "none";
+        }
+    </script>
 </body>
 </html>

@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import requests
 import os
 from dotenv import load_dotenv
+from fuzzywuzzy import process
 
 # Load environment variables
 load_dotenv()
@@ -12,9 +13,11 @@ app = Flask(__name__)
 # Fetch TMDB genre list
 def get_tmdb_genres():
     url = "https://api.themoviedb.org/3/genre/movie/list"
-    params = {"api_key": TMDB_API_KEY}  # Use the loaded API key
+    params = {"api_key": TMDB_API_KEY}
     response = requests.get(url, params=params)
-    return {genre["name"].lower(): genre["id"] for genre in response.json()["genres"]}
+    genres = response.json()["genres"]
+    print("Valid TMDB Genres:", [genre["name"].lower() for genre in genres])  # Debug line
+    return {genre["name"].lower(): genre["id"] for genre in genres}
 
 # Map moods to TMDB genre IDs
 genre_name_to_id = get_tmdb_genres()
@@ -23,8 +26,21 @@ mood_to_genre_ids = {
     "romantic": ["romance"],
     "funny": ["comedy"],
     "scared": ["horror"],
-    "thoughtful": ["drama", "mystery"]
+    "thoughtful": ["drama", "mystery"],
+    "joyful": ["comedy", "animation"],
+    "sad": ["drama", "romance"],
+    "angry": ["action", "thriller"],
+    "nostalgic": ["history", "family"],
+    "inspired": ["documentary", "history"]  # Fixed: replaced "biography"
 }
+
+# List of supported moods
+SUPPORTED_MOODS = list(mood_to_genre_ids.keys())
+
+# Fuzzy search function
+def find_closest_mood(user_input):
+    closest_match, confidence = process.extractOne(user_input, SUPPORTED_MOODS)
+    return closest_match if confidence > 70 else None
 
 # Convert genre names to IDs
 for mood, genres in mood_to_genre_ids.items():
@@ -32,7 +48,11 @@ for mood, genres in mood_to_genre_ids.items():
 
 # Recommendation function
 def recommend_movies(mood):
-    genre_ids = mood_to_genre_ids.get(mood.lower(), [])
+    closest_mood = find_closest_mood(mood)
+    if not closest_mood:
+        return []
+    
+    genre_ids = mood_to_genre_ids.get(closest_mood.lower(), [])
     if not genre_ids:
         return []
     
@@ -45,7 +65,7 @@ def recommend_movies(mood):
         "vote_count.gte": 100
     }
     response = requests.get(url, params=params)
-    return response.json()["results"][:6]  # Top 6 movies
+    return response.json()["results"][:6]
 
 # Routes
 @app.route('/', methods=['GET', 'POST'])
