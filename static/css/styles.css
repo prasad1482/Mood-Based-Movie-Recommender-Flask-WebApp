@@ -1,0 +1,18 @@
+/* Custom Styles */
+.hero-section {
+    background: linear-gradient(to right, #ff6b6b, #4ecdc4);
+    color: white;
+}
+
+.trending-section .carousel-item img {
+    height: 400px;
+    object-fit: cover;
+}
+
+.card {
+    transition: transform 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
