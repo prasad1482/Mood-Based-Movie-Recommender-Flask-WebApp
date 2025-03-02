@@ -64,15 +64,15 @@
             <h2 class="text-center mb-4">🔥 Trending Now</h2>
             <div id="trendingCarousel" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner">
-                    <div class="carousel-item active">
-                        <img src="https://image.tmdb.org/t/p/w1280/trending1.jpg" class="d-block w-100" alt="Trending Movie 1">
-                    </div>
-                    <div class="carousel-item">
-                        <img src="https://image.tmdb.org/t/p/w1280/trending2.jpg" class="d-block w-100" alt="Trending Movie 2">
-                    </div>
-                    <div class="carousel-item">
-                        <img src="https://image.tmdb.org/t/p/w1280/trending3.jpg" class="d-block w-100" alt="Trending Movie 3">
-                    </div>
+                    {% for movie in trending_movies %}
+                        <div class="carousel-item {% if loop.first %}active{% endif %}">
+                            <img src="https://image.tmdb.org/t/p/w1280{{ movie.backdrop_path }}" class="d-block w-100 carousel-image" alt="{{ movie.title }}">
+                            <div class="carousel-caption d-none d-md-block">
+                                <h5>{{ movie.title }}</h5>
+                                <p>{{ movie.overview[:100] }}...</p>
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
                 <button class="carousel-control-prev" type="button" data-bs-target="#trendingCarousel" data-bs-slide="prev">
                     <span class="carousel-control-prev-icon" aria-hidden="true"></span>

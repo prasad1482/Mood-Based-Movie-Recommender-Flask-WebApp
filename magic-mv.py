@@ -11,6 +11,7 @@ from fuzzywuzzy import process
 from textblob import TextBlob
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
+
 # Force UTF-8 encoding
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
@@ -59,8 +60,88 @@ def get_tmdb_genres():
         response.raise_for_status()
         return {genre["name"].lower(): genre["id"] for genre in response.json()["genres"]}
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching genres: {e}")
+        print(f"Error fetching genres: {e}".encode('utf-8', 'replace'))
         return {}
+
+# Fetch trending movies
+def get_trending_movies():
+    url = "https://api.themoviedb.org/3/trending/movie/week"
+    params = {"api_key": TMDB_API_KEY}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()["results"][:5]  # Fetch top 5 trending movies
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching trending movies: {e}".encode('utf-8', 'replace'))
+        return []
+
+# Correct spelling using fuzzywuzzy
+def correct_spelling(text):
+    mood_keywords = [
+        "adventurous", "romantic", "scared", "thoughtful", "nostalgic", 
+        "inspired", "angry", "arrogant", "sad", "joyful", "neutral"
+    ]
+    corrected_text = []
+    for word in text.split():
+        closest_match, confidence = process.extractOne(word, mood_keywords)
+        if confidence > 70:  # Only correct if confidence is high
+            corrected_text.append(closest_match)
+        else:
+            corrected_text.append(word)
+    return " ".join(corrected_text)
+
+# NLP-based mood detection
+def detect_mood_from_text(text):
+    # Correct spelling
+    corrected_text = correct_spelling(text)
+    print(f"Corrected text: {corrected_text}".encode('utf-8', 'replace'))  # Debug print
+
+    # Sentiment analysis
+    blob = TextBlob(corrected_text)
+    sentiment = blob.sentiment.polarity
+    print(f"Sentiment polarity: {sentiment}".encode('utf-8', 'replace'))  # Debug print
+
+    # Mood detection based on sentiment
+    if sentiment > 0.6:
+        print("Detected mood: joyful".encode('utf-8', 'replace'))
+        return "joyful"
+    elif sentiment < -0.6:
+        print("Detected mood: sad".encode('utf-8', 'replace'))
+        return "sad"
+
+    # Mood detection based on keywords
+    doc = nlp(corrected_text)
+    keywords = [token.text.lower() for token in doc if token.is_alpha]
+    print(f"Keywords extracted: {keywords}".encode('utf-8', 'replace'))  # Debug print
+
+    mood_keywords = {
+        "adventurous": ["adventure", "climb", "explore", "mountain", "hike", "trek", "journey", "thrill", "adrenaline"],
+        "romantic": ["love", "romantic", "heart", "kiss", "date", "relationship", "couple", "passion", "affection"],
+        "scared": ["scary", "fear", "horror", "afraid", "terrified", "spooky", "creepy", "panic", "frightened"],
+        "thoughtful": ["think", "deep", "philosophy", "reflect", "ponder", "meditate", "contemplate", "introspective", "serious"],
+        "nostalgic": ["nostalgia", "memory", "past", "childhood", "old", "remember", "reminisce", "retro", "vintage"],
+        "inspired": ["inspire", "motivate", "dream", "achieve", "goal", "ambition", "aspire", "encourage", "uplift"],
+        "angry": ["angry", "furious", "rage", "irritated", "annoyed", "mad", "frustrated", "outraged"],
+        "arrogant": ["arrogant", "cocky", "conceited", "proud", "boastful", "egotistical", "self-centered"],
+        "sad": ["sad", "depressed", "unhappy", "gloomy", "heartbroken", "melancholy", "sorrow", "tearful"],
+        "joyful": ["joyful", "happy", "cheerful", "excited", "delighted", "ecstatic", "elated", "blissful"]
+    }
+
+    for mood, words in mood_keywords.items():
+        if any(word in keywords for word in words):
+            print(f"Detected mood: {mood}".encode('utf-8', 'replace'))
+            return mood
+
+    # Fallback to sentiment if no keywords match
+    if sentiment > 0:
+        print("Fallback mood: joyful".encode('utf-8', 'replace'))
+        return "joyful"
+    elif sentiment < 0:
+        print("Fallback mood: sad".encode('utf-8', 'replace'))
+        return "sad"
+
+    print("No specific mood detected. Using fallback: neutral".encode('utf-8', 'replace'))
+    return "neutral"  # Fallback mood
 
 # Map moods to TMDB genre IDs
 genre_name_to_id = get_tmdb_genres()
@@ -84,57 +165,20 @@ for mood, genres in mood_to_genre_ids.items():
 
 # Fuzzy search function
 def find_closest_mood(user_input):
-    print(f"User input: {user_input}")  # Debug print
+    print(f"User input: {user_input}".encode('utf-8', 'replace'))  # Debug print
     closest_match, confidence = process.extractOne(user_input, mood_to_genre_ids.keys())
-    print(f"Closest match: {closest_match}, Confidence: {confidence}")  # Debug print
+    print(f"Closest match: {closest_match}, Confidence: {confidence}".encode('utf-8', 'replace'))  # Debug print
     return closest_match if confidence > 40 else None  # Lowered threshold to 40
-
-# NLP-based mood detection
-def detect_mood_from_text(text):
-    print(f"Input text: {text}")  # Debug print
-    blob = TextBlob(text)
-    sentiment = blob.sentiment.polarity
-    print(f"Sentiment polarity: {sentiment}")  # Debug print
-    if sentiment > 0.5:
-        print("Detected mood: joyful")
-        return "joyful"
-    elif sentiment < -0.5:
-        print("Detected mood: sad")
-        return "sad"
-    doc = nlp(text)
-    keywords = [token.text.lower() for token in doc if token.is_alpha]
-    print(f"Keywords extracted: {keywords}")  # Debug print
-    mood_keywords = {
-        "adventurous": ["adventure", "climb", "explore", "mountain", "hike", "trek", "journey"],
-        "romantic": ["love", "romantic", "heart", "kiss", "date", "relationship", "couple"],
-        "scared": ["scary", "fear", "horror", "afraid", "terrified", "spooky", "creepy"],
-        "thoughtful": ["think", "deep", "philosophy", "reflect", "ponder", "meditate", "contemplate"],
-        "nostalgic": ["nostalgia", "memory", "past", "childhood", "old", "remember", "reminisce"],
-        "inspired": ["inspire", "motivate", "dream", "achieve", "goal", "ambition", "aspire"]
-    }
-    for mood, words in mood_keywords.items():
-        if any(word in keywords for word in words):
-            print(f"Detected mood: {mood}")
-            return mood
-    # Fallback to sentiment if no keywords match
-    if sentiment > 0:
-        print("Fallback mood: joyful")
-        return "joyful"
-    elif sentiment < 0:
-        print("Fallback mood: sad")
-        return "sad"
-    print("No specific mood detected. Using fallback: neutral")
-    return "neutral"  # Fallback mood
 
 # Recommendation function
 def recommend_movies(mood):
     closest_mood = find_closest_mood(mood)
     if not closest_mood:
-        print("No closest mood found.")
+        print("No closest mood found.".encode('utf-8', 'replace'))
         return []
     genre_ids = mood_to_genre_ids.get(closest_mood.lower(), [])
     if not genre_ids:
-        print(f"No genre IDs found for mood: {closest_mood}")
+        print(f"No genre IDs found for mood: {closest_mood}".encode('utf-8', 'replace'))
         return []
     url = "https://api.themoviedb.org/3/discover/movie"
     params = {
@@ -148,16 +192,17 @@ def recommend_movies(mood):
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         movies = response.json()["results"][:6]
-        print(f"Movies fetched: {movies}".encode('utf-8', 'replace')) # Debug print
+        print(f"Movies fetched: {movies}".encode('utf-8', 'replace'))  # Debug print
         return movies
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching movies: {e}")
+        print(f"Error fetching movies: {e}".encode('utf-8', 'replace'))
         return []
 
 # Routes
 @app.route('/')
 def home():
-    return render_template('index.html')
+    trending_movies = get_trending_movies()
+    return render_template('index.html', trending_movies=trending_movies)
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
